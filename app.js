@@ -243,7 +243,7 @@ function renderTable(id, rows, type){
     ? ['Name','Type','Note?','Docs?','Docs','', '', '']
     : (type==='inc'
         ? ['Title','Amount','Recurrence','Note?','Has Docs?','Monthly Portion','', '', '']
-        : ['Title','Amount','Category','Recurrence','Note?','Has Docs?','Monthly Portion','', '', '']);
+        : ['Title','Amount','Recurrence','Note?','Has Docs?','Monthly Portion','', '', '']);
   el.innerHTML = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
   const body = document.createElement('tbody'); const ref = refMonthDate(); const incTotal = compute().incomeTotal;
   rows.forEach((r,idx)=>{
@@ -465,9 +465,7 @@ function readForm(form, kind){
     // Source linkage
     if (o.sourceId === '') o.sourceId = undefined;
     if(kind==='cont' || kind==='income' || kind==='outflow'){
-      // normalize sourceId; leave category only for outflow/cont
-      if (kind==='income'){ o.category = ''; } // deprecated
-      else { o.category = (o.category||'').trim(); }
+      // normalize sourceId
     }
     if(o.recurrence!=='One-Time'){ o.startMonth=''; o.durationMonths=''; }
   }else{
@@ -501,7 +499,6 @@ function onView(e){
       ['Title',obj.title],
       ['Amount',(type==='cont' && Number(obj.amount)<=1) ? (Number(obj.amount)*100).toFixed(2)+'%' : INR.format(Number(obj.amount||0))],
       ['Source', srcName],
-      ['Category', (type!=='inc') ? (obj.category||'') : '—'],
       ['Recurrence',obj.recurrence],
       ['Start Month',obj.startMonth||''],
       ['Duration',obj.durationMonths||''],
@@ -754,18 +751,6 @@ function migrateSourcesLinkage(){
     const byName = new Map(store.sources.map(s=> [ (s.name||'').trim().toLowerCase(), s ]));
     for(const inc of (store.incomes||[])){
       if(!inc.sourceId){
-        const key = (inc.category||'').trim().toLowerCase();
-        if(key){
-          let src = byName.get(key);
-          if(!src){
-            src = { id: uid(), name: inc.category, type: 'Unknown', note: '' };
-            store.sources.push(src);
-            byName.set(key, src);
-          }
-          inc.sourceId = src.id;
-          // category on income is deprecated once linked
-          inc.category = '';
-        }
       }
     }
   }catch(e){ console.warn('migrateSourcesLinkage failed', e); }

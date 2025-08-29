@@ -54,9 +54,9 @@ All state lives in `localStorage` (structured store) + attachments in **IndexedD
 * **Income**
   `{ id, title, amount, sourceId, recurrence, startMonth, durationMonths, docLink, note }`
 * **Outflow**
-  `{ id, title, amount, sourceId?, category, recurrence, startMonth, durationMonths, docLink, note }`
+  `{ id, title, amount, sourceId?, recurrence, startMonth, durationMonths, docLink, note }`
 * **Contingency**
-  `{ id, title, amount, sourceId?, category, recurrence, startMonth, durationMonths, docLink, note }`
+  `{ id, title, amount, sourceId?, recurrence, startMonth, durationMonths, docLink, note }`
 
   > Use amount as percentage (≤ 1.0) or fixed amount (≥ 1.0) depending on your setup.
 * **Attachment (IndexedDB ‘files’ store)**
@@ -70,8 +70,8 @@ All state lives in `localStorage` (structured store) + attachments in **IndexedD
 ### Sources Linkage
 
 * **Income** uses **Source** (required)
-* **Outflow** and **Contingency**: optional **Source** link (keeps Category for classification)
-* On first run after the update, a **migration** maps old Income `category` → a real `Source`, links via `sourceId`, and clears the deprecated `category`.
+* **Outflow** and **Contingency**: optional **Source** link
+* On first run after the update, a **migration** creates/link Sources as needed and cleans up deprecated fields.
 
 ---
 
