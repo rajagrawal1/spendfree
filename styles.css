@@ -71,3 +71,16 @@ dialog{border:0;border-radius:16px;padding:0;background:transparent}
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:#00000008;border:1px solid var(--border);border-radius:999px}
 .chip-close{appearance:none;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:0 4px;line-height:1}
 .chip-close:hover{color:var(--text)}
+
+/* View modal contrast fix */
+#modal .modal-card { 
+  /* force readable text color for dark/light themes */
+  color: var(--text);
+}
+
+/* labels vs values in the 2-column grid the View modal uses */
+#modal .grid-2 > *:nth-child(2n-1) { color: var(--muted); } /* labels (left column) */
+#modal .grid-2 > *:nth-child(2n)   { color: var(--text);  } /* values (right column) */
+
+/* ensure any "muted" chips/labels stay muted even after the overrides above */
+#modal .muted { color: var(--muted); }
