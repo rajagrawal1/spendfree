@@ -242,8 +242,8 @@ function renderTable(id, rows, type){
   const headers = type==='src'
     ? ['Name','Type','Note?','Docs?','Docs','', '', '']
     : (type==='inc'
-        ? ['Title','Amount','Source','Recurrence','Start Month','Duration','DocLink','Note?','Has Docs?','Monthly Portion','', '', '']
-        : ['Title','Amount','Source','Category','Recurrence','Start Month','Duration','DocLink','Note?','Has Docs?','Monthly Portion','', '', '']);
+        ? ['Title','Amount','Source','Recurrence','Start Month','Duration','Note?','Has Docs?','Monthly Portion','', '', '']
+        : ['Title','Amount','Source','Category','Recurrence','Start Month','Duration','Note?','Has Docs?','Monthly Portion','', '', '']);
   el.innerHTML = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
   const body = document.createElement('tbody'); const ref = refMonthDate(); const incTotal = compute().incomeTotal;
   rows.forEach((r,idx)=>{
@@ -267,7 +267,6 @@ function renderTable(id, rows, type){
         <td>${r.recurrence||''}</td>
         <td>${r.startMonth||''}</td>
         <td>${r.durationMonths||''}</td>
-        <td>${r.docLink? `<a href="${r.docLink}" target="_blank">Link</a>`:''}</td>
         <td>${(r.note && r.note.trim())?'Yes':'No'}</td>
         <td>${mp > 0 ? 'Yes' : 'No'}</td>
         <td><button class="btn ghost" data-view="${type}:${r.id}">View</button></td>
@@ -279,7 +278,7 @@ function renderTable(id, rows, type){
     // Docs row underneath
     const cols = headers.length;
     const trDocs = document.createElement('tr');
-    trDocs.innerHTML = `<td colspan="${cols}"><div class="docs-list" data-docs-list="${r.id}"><span class="muted small">Loading documents…</span></div></td>`;
+    trDocs.innerHTML = `<td colspan="${cols}"><div class="docs-list" data-docs-list="${r.id}"></div></td>`;
     body.appendChild(trDocs);
     populateDocs(r.id);
   });
@@ -508,7 +507,6 @@ function onView(e){
       ['Recurrence',obj.recurrence],
       ['Start Month',obj.startMonth||''],
       ['Duration',obj.durationMonths||''],
-      ['DocLink',obj.docLink||''],
       ['Note',(obj.note||'')]
     ];
   })();
@@ -604,9 +602,8 @@ function formTemplate(kind, obj){
     <select name="recurrence" required>${Object.keys(FACTORS).concat('One-Time').map(k=>`<option ${obj.recurrence===k?'selected':''}>${k}</option>`).join('')}</select>
     <input name="startMonth" type="month" class="one-time-only" value="${obj.startMonth||''}">
     <input name="durationMonths" type="number" min="1" class="one-time-only" value="${obj.durationMonths||''}">
-    <input name="docLink" value="${escapeAttr(obj.docLink||'')}" placeholder="DocLink (optional)">
     <textarea name="note" rows="2" placeholder="Note (optional)">${escapeHtml(obj.note||'')}</textarea>
-    <div><div class="muted small">Existing documents</div><div class="docs-list" data-docs-list="${obj.id}"><span class="muted small">Loading…</span></div></div>
+    <div><div class="muted small">Existing documents</div><div class="docs-list" data-docs-list="${obj.id}"></div></div>
     <label class="file attach"><input type="file" name="files" multiple hidden accept="image/*,application/pdf,text/*"><span class="btn ghost">📎 Attach more files</span></label>
     <ul class="attach-list"></ul>
   </form>`;
