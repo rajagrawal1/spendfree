@@ -242,8 +242,8 @@ function renderTable(id, rows, type){
   const headers = type==='src'
     ? ['Name','Type','Note?','Docs?','Docs','', '', '']
     : (type==='inc'
-        ? ['Title','Amount','Source','Recurrence','Start Month','Duration','Note?','Has Docs?','Monthly Portion','', '', '']
-        : ['Title','Amount','Source','Category','Recurrence','Start Month','Duration','Note?','Has Docs?','Monthly Portion','', '', '']);
+        ? ['Title','Amount','Recurrence','Note?','Has Docs?','Monthly Portion','', '', '']
+        : ['Title','Amount','Category','Recurrence','Note?','Has Docs?','Monthly Portion','', '', '']);
   el.innerHTML = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
   const body = document.createElement('tbody'); const ref = refMonthDate(); const incTotal = compute().incomeTotal;
   rows.forEach((r,idx)=>{
@@ -263,12 +263,10 @@ function renderTable(id, rows, type){
       tr.innerHTML = `
         <td>${r.title||''}</td>
         <td class="num">${amtLabel}</td>
-        <td>${r.category||''}</td>
         <td>${r.recurrence||''}</td>
-        <td>${r.startMonth||''}</td>
-        <td>${r.durationMonths||''}</td>
         <td>${(r.note && r.note.trim())?'Yes':'No'}</td>
         <td>${mp > 0 ? 'Yes' : 'No'}</td>
+        <td class="num">${INR.format(mp)}</td>
         <td><button class="btn ghost" data-view="${type}:${r.id}">View</button></td>
         <td><button class="btn" data-edit="${type}:${r.id}">Edit</button></td>
         <td><button class="btn danger" data-del="${type}:${r.id}">Delete</button></td>`;
