@@ -1,7 +1,7 @@
 # SpendFree — Offline-first Personal Budgeting (Web)
 
 A beautiful, minimalist, **offline** web app to plan income, outflows, and contingency buffers—designed for phones *and* desktops.
-No server. No sign-up. Your data (and documents) live **locally** in your browser, with optional **Google Drive** sync.
+No server. No sign-up. Your data (and documents) live **locally** in your browser.
 
 ---
 
@@ -21,7 +21,6 @@ No server. No sign-up. Your data (and documents) live **locally** in your browse
   * Renders with **Chart.js** if present, otherwise a **canvas fallback**
 * **Full JSON backup/restore** (entire dataset **including attachments & notes**)
 * **Offline-first** (PWA) when hosted on HTTPS or localhost
-* **Optional Google Drive sync** (data + documents) to neat folders
 
 ---
 
@@ -170,39 +169,6 @@ Place **Chart.js UMD** here:
 
 ---
 
-## Google Drive Sync (Optional)
-
-* **What it syncs**: data JSON + attachments
-* **Structure**:
-
-  ```
-  /SpendFree/data.json
-  /SpendFree/{YYYY-MM}/Incomes/
-  /SpendFree/{YYYY-MM}/Outflows/
-  /SpendFree/{YYYY-MM}/Contingencies/
-  /SpendFree/{YYYY-MM}/Sources/
-  ```
-* **Setup**:
-
-  1. In Google Cloud Console: enable **Drive API**
-  2. Create **OAuth Client (Web)**
-
-     * Authorized JS origins: your GitHub Pages origin (e.g., `https://<user>.github.io`)
-  3. In `index.html`, set:
-
-     ```html
-     <script>
-     window.DRIVE_CONFIG = {
-       apiKey: 'YOUR_API_KEY',
-       clientId: 'YOUR_OAUTH_CLIENT_ID'
-     };
-     window.DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
-     </script>
-     ```
-  4. Use the in-app “Connect Google Drive” button (once configured)
-
-> Keys are yours; the app never ships any secrets.
-
 ---
 
 ## Keyboard & UX Tips
@@ -249,7 +215,7 @@ Place **Chart.js UMD** here:
 ## Privacy
 
 * All data stays in your browser (localStorage + IndexedDB).
-* Nothing is sent anywhere unless you explicitly connect Google Drive (then only to your Drive).
+* Nothing is sent anywhere.
 * You can **Export Data** anytime and store securely.
 
 ---

@@ -7,13 +7,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0090e7">
   <link rel="stylesheet" href="styles.css">
-  <!-- Google API (optional; loaded when Sync is clicked) -->
-  <script>
-    window.DRIVE_CONFIG = { apiKey: '', clientId: '' }; // <- Fill these to enable Drive sync
-    window.DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
-  </script>
-  
-    <!-- Local vendor copies; drop the real files into /vendor to enable full features -->
+  <!-- Local vendor copies; drop the real files into /vendor to enable full features -->
   <script defer src="vendor/chart.umd.min.js"></script>
     <script defer src="app.js"></script>
 </head>
@@ -28,7 +22,6 @@
   </div>
   <div class="actions">
     <button id="themeToggle" class="btn ghost" aria-label="Toggle theme">🌙</button>
-    <button id="btn-sync" class="btn ghost">Sync</button>
     <button id="installBtn" class="btn ghost" hidden>Install</button>
   </div>
 </header>
@@ -177,21 +170,6 @@
         <p class="muted">Optional monthly buffer. You can also set % allocations or goal entries in Contingencies.</p>
       </div>
       <div class="stack"><button id="btn-export-json" class="btn">Export Data</button><label class="file"><input id="file-import-json" type="file" accept=".json" hidden><span class="btn ghost">Import Data</span></label><button id="btn-clear" class="btn danger">Reset Data</button></div>
-      <div>
-        <h2>Google Drive Sync</h2>
-        <p class="muted">Requires <b>API Key</b> + <b>OAuth Client ID</b> with Drive API enabled and Authorized JavaScript origin set to your GitHub Pages domain.</p>
-        <ol class="muted small">
-          <li>Create a project in Google Cloud Console.</li>
-          <li>Enable <b>Google Drive API</b>.</li>
-          <li>Create OAuth Client ID (type: <b>Web</b>) & add your Pages URL to Authorized origins.</li>
-          <li>Set <code>window.DRIVE_CONFIG.apiKey</code> and <code>clientId</code> in <code>index.html</code>.</li>
-        </ol>
-        <div class="stack"><span id="libStatus" class="badge">Checking libraries…</span>
-          <button id="btn-drive-connect" class="btn">Connect Google Drive</button>
-          <button id="btn-drive-sync" class="btn ghost">Sync Now</button>
-        </div>
-        <p class="muted">Folder layout: <code>/SpendFree/{YYYY-MM}/(Incomes|Outflows|Contingencies|Sources)</code>. Data JSON at <code>/SpendFree/data.json</code>.</p>
-      </div>
     </div>
   </section>
 

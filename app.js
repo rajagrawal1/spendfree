@@ -400,9 +400,7 @@ function bindForms(){
 
   qs('#btn-export-json').addEventListener('click', exportJSON);
   qs('#file-import-json').addEventListener('change', (e)=>{ const f=e.target.files[0]; if(f) importJSON(f); });
-  qs('#btn-drive-connect').addEventListener('click', connectDrive);
-  qs('#btn-drive-sync').addEventListener('click', syncDrive);
-  qs('#btn-sync').addEventListener('click', syncDrive);
+  // Google Drive event listeners removed
 
   qs('#btn-clear').addEventListener('click', ()=>{ if(confirm('Reset all data?')){ localStorage.removeItem(LS_KEY); location.reload();
 migrateSourcesLinkage(); } });
@@ -760,55 +758,7 @@ function importJSON(file){
   reader.readAsText(file);
 }
 
-// ----- Google Drive (same as v2) -----
-let gapiLoaded=false, driveAuthed=false;
-async function loadGapi(){ return await new Promise((res,rej)=>{ if(gapiLoaded) return res(); const s=document.createElement('script'); s.src='https://apis.google.com/js/api.js'; s.onload=()=>{ gapiLoaded=true; res(); }; s.onerror=rej; document.head.appendChild(s); }); }
-async function connectDrive(){
-  if(!window.DRIVE_CONFIG.apiKey || !window.DRIVE_CONFIG.clientId) return toast('Set DRIVE_CONFIG apiKey & clientId in index.html','error');
-  await loadGapi();
-  await new Promise(r=> gapi.load('client:auth2', r));
-  await gapi.client.init({ apiKey: window.DRIVE_CONFIG.apiKey, clientId: window.DRIVE_CONFIG.clientId, scope: window.DRIVE_SCOPES, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'] });
-  const auth = gapi.auth2.getAuthInstance();
-  if(!auth.isSignedIn.get()){ await auth.signIn(); }
-  driveAuthed = true; toast('Drive connected');
-}
-async function ensureFolder(name, parentId=null){
-  const q = `'${parentId||'root'}' in parents and name='${name}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
-  const found = await gapi.client.drive.files.list({q, fields:'files(id,name)'});
-  if(found.result.files.length) return found.result.files[0].id;
-  const meta = { name, mimeType:'application/vnd.google-apps.folder', parents: parentId?[parentId]:undefined };
-  const created = await gapi.client.drive.files.create({ resource: meta, fields:'id' });
-  return created.result.id;
-}
-async function uploadBytes(name, bytes, mime, parentId){
-  const boundary = '-------314159265358979323846';
-  const delimiter = '\r\n--' + boundary + '\r\n'; const closeDelim = '\r\n--' + boundary + '--';
-  const meta = { name, parents:[parentId] };
-  const base64Data = btoa(String.fromCharCode(...new Uint8Array(bytes)));
-  const body = delimiter + 'Content-Type: application/json; charset=UTF-8\r\n\r\n' + JSON.stringify(meta) + delimiter + 'Content-Type: '+(mime||'application/octet-stream')+'\r\nContent-Transfer-Encoding: base64\r\n\r\n' + base64Data + closeDelim;
-  const resp = await gapi.client.request({ path:'/upload/drive/v3/files', method:'POST', params:{uploadType:'multipart'}, headers:{'Content-Type':'multipart/related; boundary=' + boundary}, body });
-  return resp.result.id;
-}
-async function syncDrive(){
-  try{
-    if(!driveAuthed) await connectDrive();
-    const root = await ensureFolder('SpendFree');
-    const data = new TextEncoder().encode(JSON.stringify(store));
-    await uploadBytes('data.json', data, 'application/json', root);
-    const monthFolder = await ensureFolder(store.settings.refMonth, root);
-    const groups = [['Incomes', store.incomes], ['Outflows', store.outflows], ['Contingencies', store.contingencies], ['Sources', store.sources]];
-    for(const [name, arr] of groups){
-      const fId = await ensureFolder(name, monthFolder);
-      for(const item of arr){
-        const files = await listFiles(item.id);
-        for(const f of files){
-          await uploadBytes(f.name, new Uint8Array(f.data), f.type||'application/octet-stream', fId);
-        }
-      }
-    }
-    toast('Synced to Drive');
-  }catch(e){ console.error(e); toast('Drive sync failed','error'); }
-}
+// Google Drive functionality removed
 
 // ----- Utilities -----
 function escapeHtml(s){ s = (s===undefined||s===null)? '' : String(s); return s.replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
