@@ -227,7 +227,9 @@ function render(){
   updateChart(incomeTotal, outflowTotal, contTotal, safe);
 
   renderTable('tbl-income', store.incomes, 'inc');
-  populateSourceSelects();
+  // Auto-select first source if sources exist (for scenario 2)
+  const autoSelectFirst = store.sources.length > 0;
+  populateSourceSelects(null, autoSelectFirst);
   renderTable('tbl-outflow', store.outflows, 'out');
   renderTable('tbl-cont', store.contingencies, 'cont');
   renderTable('tbl-source', store.sources, 'src');
@@ -240,8 +242,8 @@ function renderTable(id, rows, type){
   const headers = type==='src'
     ? ['Name','Type','Note?','Docs?','Docs','', '', '']
     : (type==='inc'
-        ? ['Title','Amount','Source','Recurrence','Start Month','Duration','DocLink','Note?','Docs?','Monthly Portion','', '', '']
-        : ['Title','Amount','Source','Category','Recurrence','Start Month','Duration','DocLink','Note?','Docs?','Monthly Portion','', '', '']);
+        ? ['Title','Amount','Source','Recurrence','Start Month','Duration','DocLink','Note?','Has Docs?','Monthly Portion','', '', '']
+        : ['Title','Amount','Source','Category','Recurrence','Start Month','Duration','DocLink','Note?','Has Docs?','Monthly Portion','', '', '']);
   el.innerHTML = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
   const body = document.createElement('tbody'); const ref = refMonthDate(); const incTotal = compute().incomeTotal;
   rows.forEach((r,idx)=>{
@@ -267,7 +269,7 @@ function renderTable(id, rows, type){
         <td>${r.durationMonths||''}</td>
         <td>${r.docLink? `<a href="${r.docLink}" target="_blank">Link</a>`:''}</td>
         <td>${(r.note && r.note.trim())?'Yes':'No'}</td>
-        <td class="num">${INR.format(mp)}</td>
+        <td>${mp > 0 ? 'Yes' : 'No'}</td>
         <td><button class="btn ghost" data-view="${type}:${r.id}">View</button></td>
         <td><button class="btn" data-edit="${type}:${r.id}">Edit</button></td>
         <td><button class="btn danger" data-del="${type}:${r.id}">Delete</button></td>`;
@@ -427,6 +429,14 @@ function bindForms(){
       const files = fileInput ? fileInput.files : null;
       if(files && files.length){ await saveFiles(obj.id, files); await refreshDocCount(obj.id); } // ensure saved before render
       form.reset(); if(list) list.innerHTML=''; save(); render(); toast('Added');
+      
+      // Auto-select logic for sources
+      if (kind === 'source') {
+        // Check if this is the first source being added
+        const isFirstSource = store.sources.length === 1;
+        // Re-populate source selects with auto-selection
+        populateSourceSelects(null, isFirstSource);
+      }
     });
   });
 
@@ -684,12 +694,18 @@ function toast(msg, type='ok'){
 }
 
 
-function populateSourceSelects(root){
+function populateSourceSelects(root, autoSelectFirst = false){
   const selects = (root || document).querySelectorAll('select[name=sourceId]');
   selects.forEach(sel=>{
     const cur = sel.value;
     sel.innerHTML = '<option value="">(No Source)</option>' + store.sources.map(s=> `<option value="${s.id}">${escapeHtml(s.name||'Untitled')}</option>`).join('');
-    if(cur) sel.value = cur;
+    
+    // Auto-select logic
+    if (autoSelectFirst && store.sources.length > 0) {
+      sel.value = store.sources[0].id;
+    } else if (cur) {
+      sel.value = cur;
+    }
   });
 }
 function quickAddSource(){
@@ -697,7 +713,10 @@ function quickAddSource(){
   if(!name) return;
   const src = { id: uid(), name: name.trim(), type: 'Unknown', note: '' };
   store.sources.push(src); save();
-  populateSourceSelects();
+  
+  // Auto-select logic for quick add
+  const isFirstSource = store.sources.length === 1;
+  populateSourceSelects(null, isFirstSource);
   render(); toast('Source added');
 }
 
