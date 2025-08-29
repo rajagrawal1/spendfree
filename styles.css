@@ -64,6 +64,9 @@ dialog{border:0;border-radius:16px;padding:0;background:transparent}
 .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#00000008;color:var(--muted);font-size:.75rem}
 .docs-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .docs-list a{padding:4px 8px;border:1px solid var(--border);border-radius:999px;text-decoration:none;color:var(--text);background:#00000008}
+.docs-item{margin-bottom:4px}
+.doc-remove{padding:2px 6px;font-size:0.8rem;line-height:1;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center}
+.doc-remove:hover{background:#ef4444;color:white}
 
 .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;background:#00000008;border:1px solid var(--border);border-radius:999px}
 .chip-close{appearance:none;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:0 4px;line-height:1}

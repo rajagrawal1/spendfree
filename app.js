@@ -290,16 +290,7 @@ function renderTable(id, rows, type){
 async function populateDocs(entryId){
   const wrap = document.querySelector(`[data-docs-list="${entryId}"]`);
   if(!wrap) return;
-  const files = await listFiles(entryId);
-  if(!files.length){ wrap.innerHTML = `<span class="muted small">No documents</span>`; return; }
-  wrap.innerHTML = '';
-  for(const f of files){
-    const blob = new Blob([f.data], {type:f.type||'application/octet-stream'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href=url; a.target='_blank'; a.textContent=f.name;
-    wrap.appendChild(a);
-  }
-
+  await displayAttachmentsWithRemove(wrap, entryId, false);
 }
 async function deleteFile(fileId){
   await idbOpen();
@@ -313,6 +304,57 @@ async function deleteFile(fileId){
   });
 }
 
+// ----- Display attachments with remove buttons -----
+async function displayAttachmentsWithRemove(wrap, entryId, modal = false) {
+  if(!wrap) return;
+  const files = await listFiles(entryId);
+  if(!files.length){
+    wrap.innerHTML = `<span class="muted small">No documents</span>`;
+    return;
+  }
+  
+  wrap.innerHTML = '';
+  for(const rec of files){
+    const div = document.createElement('div');
+    div.className = 'docs-item';
+    div.innerHTML = `
+      <div class="stack" style="gap: 8px; align-items: center;">
+        <a href="#" class="doc-link" data-file-id="${rec.id}" data-entry-id="${entryId}">${escapeHtml(rec.name)}</a>
+        <button type="button" class="btn ghost small doc-remove" data-file-id="${rec.id}" data-entry-id="${entryId}" title="Remove document">×</button>
+      </div>
+    `;
+    wrap.appendChild(div);
+  }
+  
+  // Add event listeners for remove buttons
+  wrap.querySelectorAll('.doc-remove').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const fileId = btn.dataset.fileId;
+      const entryId = btn.dataset.entryId;
+      if(confirm('Remove this document?')) {
+        await deleteFile(fileId);
+        await refreshDocCount(entryId);
+        // Refresh the display
+        await displayAttachmentsWithRemove(wrap, entryId, modal);
+      }
+    });
+  });
+  
+  // Add event listeners for document links
+  wrap.querySelectorAll('.doc-link').forEach(link => {
+    link.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const fileId = link.dataset.fileId;
+      const entryId = link.dataset.entryId;
+      const files = await listFiles(entryId);
+      const rec = files.find(f => f.id === fileId);
+      if(rec) {
+        openBlobInNewTab(rec);
+      }
+    });
+  });
+}
 
 // ----- Chart -----
 
@@ -369,9 +411,6 @@ function bindForms(){
     if(blocked.length){
       const li=document.createElement('li'); li.textContent=`Blocked: ${blocked.map(x=>x.name).join(', ')}`; li.style.opacity='0.6'; list.appendChild(li);
     }
-        Array.from(fileInput.files||[]).forEach(f=>{
-          const li = document.createElement('li'); li.textContent = f.name; list.appendChild(li);
-        });
       });
     }
 
@@ -494,17 +533,7 @@ function onEdit(e){
     populateSourceSelects(f);
     const wrap = dlg.querySelector('[data-docs-list="'+obj.id+'"]');
     if(wrap){
-      const files = await listFiles(obj.id);
-      if(!files.length){ wrap.innerHTML = `<span class="muted small">No documents</span>`; }
-      else{
-        wrap.innerHTML = '';
-        for(const rec of files){
-          const blob = new Blob([rec.data], {type:rec.type||'application/octet-stream'});
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a'); a.href=url; a.target='_blank'; a.textContent=rec.name;
-          wrap.appendChild(a);
-        }
-      }
+      await displayAttachmentsWithRemove(wrap, obj.id, true);
     }
   })();
 }
