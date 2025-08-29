@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>SpendFree</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#0090e7">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Google API (optional; loaded when Sync is clicked) -->
+  <script>
+    window.DRIVE_CONFIG = { apiKey: '', clientId: '' }; // <- Fill these to enable Drive sync
+    window.DRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+  </script>
+  
+    <!-- Local vendor copies; drop the real files into /vendor to enable full features -->
+  <script defer src="vendor/chart.umd.min.js"></script>
+    <script defer src="app.js"></script>
+</head>
+<body>
+<header class="app-header">
+  <div class="brand">
+    <div class="logo">Rs</div>
+    <div>
+      <h1>SpendFree</h1>
+      <p class="muted">Your honest monthly Safe-to-Spend number</p>
+    </div>
+  </div>
+  <div class="actions">
+    <button id="themeToggle" class="btn ghost" aria-label="Toggle theme">🌙</button>
+    <button id="btn-sync" class="btn ghost">Sync</button>
+    <button id="installBtn" class="btn ghost" hidden>Install</button>
+  </div>
+</header>
+
+<nav class="tabs" role="tablist" aria-label="Main">
+  <button class="tab active" data-tab="dashboard" aria-selected="true">Dashboard</button>
+  <button class="tab" data-tab="incomes">Incomes</button>
+  <button class="tab" data-tab="outflows">Outflows</button>
+  <button class="tab" data-tab="contingencies">Contingencies</button>
+  <button class="tab" data-tab="sources">Sources</button>
+  <button class="tab" data-tab="settings">Settings</button>
+  <button class="tab" data-tab="help">Help</button>
+</nav>
+
+<main>
+  <!-- DASHBOARD -->
+  <section id="dashboard" class="view active" role="tabpanel">
+    <div class="kpis grid">
+      <div class="card kpi">
+        <div class="kpi-label">Income Total (₹)</div>
+        <div id="kpi-income" class="kpi-value">₹0.00</div>
+      </div>
+      <div class="card kpi">
+        <div class="kpi-label">Outflow Total (₹)</div>
+        <div id="kpi-outflow" class="kpi-value">₹0.00</div>
+      </div>
+      <div class="card kpi">
+        <div class="kpi-label">Contingency Total (₹)</div>
+        <div id="kpi-cont" class="kpi-value">₹0.00</div>
+        <div class="kpi-sub"><span>Fixed</span><span id="kpi-cont-fixed">₹0.00</span></div>
+        <div class="kpi-sub"><span>Allocations (₹/month)</span><span id="kpi-cont-alloc">₹0.00</span></div>
+        <div class="kpi-sub"><span>Goals (₹/month)</span><span id="kpi-cont-goals">₹0.00</span></div>
+      </div>
+      <div class="card kpi safe">
+        <div class="kpi-label">Safe-to-Spend (₹)</div>
+        <div id="kpi-safe" class="kpi-value">₹0.00</div>
+      </div>
+    </div>
+    <div class="card chart-card"><canvas id="kpiChart"></canvas></div>
+  </section>
+
+  <!-- INCOMES -->
+  <section id="incomes" class="view" role="tabpanel">
+    <div class="card">
+      <div class="card-head"><h2>Add</h2></div></div>
+      <form id="form-income" class="grid-2 need-validate">
+        <input name="title" placeholder="Title" required>
+        <input name="amount" type="number" step="0.01" placeholder="Amount (₹)" required min="0.01">
+        <div class="stack"><select name="sourceId" required></select><button type="button" class="btn ghost small" data-add-source>+ Add Source</button></div>
+        <select name="recurrence" required>
+          <option>Monthly</option><option>Daily</option><option>Weekly</option><option>Bi-Weekly</option><option>Quarterly</option><option>Half-Yearly</option><option>Yearly</option><option>One-Time</option>
+        </select>
+        <input name="startMonth" type="month" class="one-time-only" placeholder="Start Month">
+        <input name="durationMonths" type="number" min="1" class="one-time-only" placeholder="Duration (months)">
+        <input name="docLink" placeholder="DocLink (optional)">
+        <textarea name="note" rows="2" placeholder="Note (optional)"></textarea>
+        <label class="file attach"><input type="file" name="files" accept="image/*,application/pdf,text/*" multiple hidden><span class="btn ghost">📎 Attach files</span></label>
+        <ul class="attach-list"></ul>
+        <button class="btn primary">Add</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table class="table" id="tbl-income"></table></div>
+    </div>
+  </section>
+
+  <!-- OUTFLOWS -->
+  <section id="outflows" class="view" role="tabpanel">
+    <div class="card">
+      <div class="card-head"><h2>Add</h2></div></div>
+      <form id="form-outflow" class="grid-2 need-validate">
+        <input name="title" placeholder="Title" required>
+        <input name="amount" type="number" step="0.01" placeholder="Amount (₹)" required min="0.01">
+        <div class="stack"><select name="sourceId"></select><button type="button" class="btn ghost small" data-add-source>+ Add Source</button></div><input name="category" placeholder="Category (e.g., Rent)" required>
+        <select name="recurrence" required>
+          <option>Monthly</option><option>Daily</option><option>Weekly</option><option>Bi-Weekly</option><option>Quarterly</option><option>Half-Yearly</option><option>Yearly</option><option>One-Time</option>
+        </select>
+        <input name="startMonth" type="month" class="one-time-only" placeholder="Start Month">
+        <input name="durationMonths" type="number" min="1" class="one-time-only" placeholder="Duration (months)">
+        <input name="docLink" placeholder="DocLink (optional)">
+        <textarea name="note" rows="2" placeholder="Note (optional)"></textarea>
+        <label class="file attach"><input type="file" name="files" accept="image/*,application/pdf,text/*" multiple hidden><span class="btn ghost">📎 Attach files</span></label>
+        <ul class="attach-list"></ul>
+        <button class="btn primary">Add</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table class="table" id="tbl-outflow"></table></div>
+    </div>
+  </section>
+
+  <!-- CONTINGENCIES -->
+  <section id="contingencies" class="view" role="tabpanel">
+    <div class="card">
+      <div class="card-head"><h2>Add</h2></div></div>
+      <form id="form-cont" class="grid-2 need-validate">
+        <input name="title" placeholder="Title" required>
+        <input name="amount" type="number" step="0.01" placeholder="Amount (₹) or % (0.10 = 10%)" required min="0.00">
+        <div class="stack"><select name="sourceId"></select><button type="button" class="btn ghost small" data-add-source>+ Add Source</button></div><input name="category" placeholder="Category (e.g., Emergency Fund)" required>
+        <select name="recurrence" required>
+          <option>Monthly</option><option>Daily</option><option>Weekly</option><option>Bi-Weekly</option><option>Quarterly</option><option>Half-Yearly</option><option>Yearly</option><option>One-Time</option>
+        </select>
+        <input name="startMonth" type="month" class="one-time-only" placeholder="Start Month">
+        <input name="durationMonths" type="number" min="1" class="one-time-only" placeholder="Duration (months)">
+        <input name="docLink" placeholder="DocLink (optional)">
+        <textarea name="note" rows="2" placeholder="Note (optional)"></textarea>
+        <label class="file attach"><input type="file" name="files" accept="image/*,application/pdf,text/*" multiple hidden><span class="btn ghost">📎 Attach files</span></label>
+        <ul class="attach-list"></ul>
+        <button class="btn primary">Add</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table class="table" id="tbl-cont"></table></div>
+    </div>
+  </section>
+
+  <!-- SOURCES -->
+  <section id="sources" class="view" role="tabpanel">
+    <div class="card">
+      <h2>Income Sources</h2>
+      <form id="form-source" class="grid-2">
+        <input name="name" placeholder="Source name" required>
+        <input name="type" placeholder="Type (e.g., Employer, Client, Business)" required>
+        <textarea name="note" rows="2" placeholder="Note (optional)"></textarea>
+        <label class="file attach"><input type="file" name="files" accept="image/*,application/pdf,text/*" multiple hidden><span class="btn ghost">📎 Attach files</span></label>
+        <ul class="attach-list"></ul>
+        <button class="btn primary">Add Source</button>
+      </form>
+    </div>
+    <div class="card">
+      <div class="table-wrap"><table class="table" id="tbl-source"></table></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section id="settings" class="view" role="tabpanel">
+    <div class="card grid-2">
+      <div>
+        <h2>Reference Month</h2>
+        <input id="refMonth" type="month">
+        <p class="muted">All normalization and one-time windows are evaluated against this month.</p>
+      </div>
+      <div>
+        <h2>Fixed Contingency (₹/month)</h2>
+        <input id="contFixed" type="number" step="0.01" placeholder="₹0.00">
+        <p class="muted">Optional monthly buffer. You can also set % allocations or goal entries in Contingencies.</p>
+      </div>
+      <div class="stack"><button id="btn-export-json" class="btn">Export Data</button><label class="file"><input id="file-import-json" type="file" accept=".json" hidden><span class="btn ghost">Import Data</span></label><button id="btn-clear" class="btn danger">Reset Data</button></div>
+      <div>
+        <h2>Google Drive Sync</h2>
+        <p class="muted">Requires <b>API Key</b> + <b>OAuth Client ID</b> with Drive API enabled and Authorized JavaScript origin set to your GitHub Pages domain.</p>
+        <ol class="muted small">
+          <li>Create a project in Google Cloud Console.</li>
+          <li>Enable <b>Google Drive API</b>.</li>
+          <li>Create OAuth Client ID (type: <b>Web</b>) & add your Pages URL to Authorized origins.</li>
+          <li>Set <code>window.DRIVE_CONFIG.apiKey</code> and <code>clientId</code> in <code>index.html</code>.</li>
+        </ol>
+        <div class="stack"><span id="libStatus" class="badge">Checking libraries…</span>
+          <button id="btn-drive-connect" class="btn">Connect Google Drive</button>
+          <button id="btn-drive-sync" class="btn ghost">Sync Now</button>
+        </div>
+        <p class="muted">Folder layout: <code>/SpendFree/{YYYY-MM}/(Incomes|Outflows|Contingencies|Sources)</code>. Data JSON at <code>/SpendFree/data.json</code>.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- HELP -->
+  <section id="help" class="view" role="tabpanel">
+    <div class="card">
+      <h2>How it works</h2>
+      <ol>
+        <li>Add incomes, outflows, and contingencies (₹ or % of income).</li>
+        <li>Set the Reference Month and (optionally) a fixed contingency.</li>
+        <li>We normalize everything to monthly using: Daily 30.44, Weekly 4.345, Bi-Weekly 2.17, Quarterly ÷3, Half-Yearly ÷6, Yearly ÷12. One-Time is split evenly across its window.</li>
+        <li>Safe-to-Spend = Income − (Outflows + Contingency Total).</li>
+      </ol>
+    </div>
+  </section>
+</main>
+
+<footer class="app-footer"><span id="status">Ready</span></footer>
+
+<!-- View/Edit Modal -->
+<dialog id="modal" aria-modal="true">
+  <form method="dialog" class="modal-card">
+    <h3 id="modal-title">View</h3>
+    <div id="modal-body"></div>
+    <menu class="modal-actions">
+      <button value="cancel" class="btn ghost">Close</button>
+      <button id="modal-save" value="default" class="btn primary" hidden>Save</button>
+    </menu>
+  </form>
+</dialog>
+
+<script>
+let deferred;
+window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferred=e; document.getElementById('installBtn').hidden=false; });
+document.getElementById('installBtn').addEventListener('click', async ()=>{ if(!deferred) return; deferred.prompt(); await deferred.userChoice; deferred=null; document.getElementById('installBtn').hidden=true; });
+if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ navigator.serviceWorker.register('./service-worker.js'); }
+</script>
+</body>
+</html>
