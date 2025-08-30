@@ -237,7 +237,11 @@ function render(){
   qs('#refMonth').value = store.settings.refMonth;
   qs('#contFixed').value = store.settings.contingencyFixed;
 }
-function renderTable(id, rows, type){
+function hasAttachmentsForEntry(entryId){
+  return listFiles(entryId).then(files => files.length > 0);
+}
+
+async function renderTable(id, rows, type){
   const el = qs('#'+id);
   const headers = type==='src'
     ? ['Name','Type','Note?','Docs?','Docs','', '', '']
@@ -250,11 +254,18 @@ function renderTable(id, rows, type){
     const mp = (type==='src') ? 0 : monthlyPortion(r, ref, type==='cont'?'cont':'row', incTotal);
     const tr = document.createElement('tr');
     if(type==='src'){
+      // Check if entry has attachments
+      hasAttachmentsForEntry(r.id).then(hasAttachments => {
+        const docsCell = tr.querySelector('td:nth-child(4)');
+        if (docsCell) {
+          docsCell.innerHTML = hasAttachments ? `<button class="btn ghost" data-docs="${r.id}">Open</button>` : '<span class="muted small">No documents</span>';
+        }
+      });
       tr.innerHTML = `
         <td>${r.name||''}</td>
         <td>${r.type||''}</td>
         <td>${(r.note && r.note.trim())?'Yes':'No'}</td>
-        <td><button class="btn ghost" data-docs="${r.id}">Open</button></td>
+        <td><span class="docs-loading">Loading...</span></td>
         <td><button class="btn ghost" data-view="${type}:${r.id}">View</button></td>
         <td><button class="btn" data-edit="${type}:${r.id}">Edit</button></td>
         <td><button class="btn danger" data-del="${type}:${r.id}">Delete</button></td>`;
@@ -488,12 +499,12 @@ function validateForm(obj, kind){
 }
 
 // ----- Modals (View / Edit / Duplicate) -----
-function onView(e){
+async function onView(e){
   const [type,id] = e.currentTarget.dataset.view.split(':');
   const obj = findById(type,id);
   const entries = (type==='src') ? [
     ['Name',obj.name],['Type',obj.type],['Note',(obj.note||'')]
-  ] : (function(){ 
+  ] : (function(){
     const srcName = obj.sourceId ? (store.sources.find(s=> s.id===obj.sourceId)?.name || '') : '';
     return [
       ['Title',obj.title],
@@ -506,7 +517,11 @@ function onView(e){
     ];
   })();
   const extras = (obj.recurrence==='One-Time' && type!=='src') ? `<button class="btn ghost" data-dup="${type}:${obj.id}">Duplicate window…</button>` : '';
-  const filesBtn = `<button class="btn ghost" data-docs="${obj.id}">Open documents</button>`;
+  
+  // Check if entry has attachments before showing the button
+  const hasAttachments = await hasAttachmentsForEntry(obj.id);
+  const filesBtn = hasAttachments ? `<button class="btn ghost" data-docs="${obj.id}">Open documents</button>` : '<span class="muted small">No documents</span>';
+  
   openModal('View', `<div class="grid-2">${entries.map(e=>`<div><div class="muted">${e[0]}</div><div>${escapeHtml(e[1]||'')}</div></div>`).join('')}</div><div class="stack" style="margin-top:10px">${filesBtn}${extras}</div>`, false);
   qs('#modal [data-docs]')?.addEventListener('click', onDocs);
   qs('#modal [data-dup]')?.addEventListener('click', onDuplicate);
