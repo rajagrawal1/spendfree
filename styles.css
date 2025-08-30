@@ -54,7 +54,7 @@ input:focus,select:focus,button:focus,textarea:focus{box-shadow:0 0 0 3px var(--
 .btn.danger{background:#b91c1c;color:white;border:0}
 .file{display:inline-block}
 .attach{align-items:center}
-.attach .btn{display:inline-flex;gap:6px;align-items:center;min-height:44px;min-width:120px;justify-content:center;font-weight:500;letter-spacing:0.02em;border-radius:12px;padding:10px 16px;position:relative;overflow:hidden}
+.attach .btn{display:inline-flex;gap:6px;align-items:center;min-height:44px;min-width:120px;justify-content:center;font-weight:500;letter-spacing:0.02em;border-radius:12px;padding:10px 16px;position:relative;overflow-hidden;outline: 1px solid var(--muted);outline-offset: 1px;}
 .attach .btn::before{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(45deg,transparent,rgba(255,255,255,0.1),transparent);transform:translateX(-100%);transition:transform 0.6s}
 .attach .btn:hover::before{transform:translateX(100%)}
 .attach-list{list-style:none;margin:6px 0 0 0;padding:0;display:flex;gap:8px;flex-wrap:wrap}
