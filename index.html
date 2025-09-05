@@ -7,9 +7,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#0090e7">
   <link rel="stylesheet" href="styles.css">
-  <!-- Local vendor copies; drop the real files into /vendor to enable full features -->
-  <script defer src="vendor/chart.umd.min.js"></script>
-    <script defer src="app.js"></script>
+  <!-- Chart.js for enhanced charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <header class="app-header">
@@ -23,6 +22,7 @@
   <div class="actions">
     <button id="themeToggle" class="btn ghost" aria-label="Toggle theme">🌙</button>
     <button id="installBtn" class="btn ghost" hidden>Install</button>
+    <span id="installInstructions" class="muted small" hidden></span>
   </div>
 </header>
 
@@ -66,7 +66,7 @@
   <!-- INCOMES -->
   <section id="incomes" class="view" role="tabpanel">
     <div class="card">
-      <div class="card-head"><h2>Add</h2></div></div>
+      <div class="card-head"><h2>Add</h2></div>
       <form id="form-income" class="grid-2 need-validate">
         <input name="title" placeholder="Title" required>
         <input name="amount" type="number" step="0.01" placeholder="Amount (₹)" required min="0.01">
@@ -90,7 +90,7 @@
   <!-- OUTFLOWS -->
   <section id="outflows" class="view" role="tabpanel">
     <div class="card">
-      <div class="card-head"><h2>Add</h2></div></div>
+      <div class="card-head"><h2>Add</h2></div>
       <form id="form-outflow" class="grid-2 need-validate">
         <input name="title" placeholder="Title" required>
         <input name="amount" type="number" step="0.01" placeholder="Amount (₹)" required min="0.01">
@@ -114,10 +114,10 @@
   <!-- CONTINGENCIES -->
   <section id="contingencies" class="view" role="tabpanel">
     <div class="card">
-      <div class="card-head"><h2>Add</h2></div></div>
+      <div class="card-head"><h2>Add</h2></div>
       <form id="form-cont" class="grid-2 need-validate">
         <input name="title" placeholder="Title" required>
-        <input name="amount" type="number" step="0.01" placeholder="Amount (₹) or % (0.10 = 10%)" required min="0.00">
+        <input name="amount" type="number" step="0.01" placeholder="Amount (₹) or % (0.10 = 10%)" required min="0.01">
         <div class="stack"><select name="sourceId"></select><button type="button" class="btn ghost small" data-add-source>+ Add Source</button></div>
         <select name="recurrence" required>
           <option>Monthly</option><option>Daily</option><option>Weekly</option><option>Bi-Weekly</option><option>Quarterly</option><option>Half-Yearly</option><option>Yearly</option><option>One-Time</option>
@@ -199,10 +199,24 @@
 </dialog>
 
 <script>
-let deferred;
-window.addEventListener('beforeinstallprompt', (e)=>{ e.preventDefault(); deferred=e; document.getElementById('installBtn').hidden=false; });
-document.getElementById('installBtn').addEventListener('click', async ()=>{ if(!deferred) return; deferred.prompt(); await deferred.userChoice; deferred=null; document.getElementById('installBtn').hidden=true; });
+if ('beforeinstallprompt' in window) {
+  let deferred;
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); deferred = e; document.getElementById('installBtn').hidden = false; });
+  document.getElementById('installBtn').addEventListener('click', async () => { if (!deferred) return; deferred.prompt(); await deferred.userChoice; deferred = null; document.getElementById('installBtn').hidden = true; });
+} else {
+  const instructions = document.getElementById('installInstructions');
+  const ua = navigator.userAgent;
+  if (ua.includes('Firefox')) {
+    instructions.textContent = 'Manual install: Click the install icon in the address bar';
+  } else if (ua.includes('Safari') && !ua.includes('Chrome')) {
+    instructions.textContent = 'Manual install: Tap Share > Add to Home Screen';
+  } else {
+    instructions.textContent = 'Manual install: Look for "Install" in the browser menu';
+  }
+  instructions.hidden = false;
+}
 if('serviceWorker' in navigator && (location.protocol==='https:' || location.hostname==='localhost')){ navigator.serviceWorker.register('./service-worker.js'); }
 </script>
+<script src="app.js"></script>
 </body>
 </html>

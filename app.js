@@ -13,6 +13,40 @@ function libsReady(){
   }
   return !!window.Chart;
 }
+
+// Wait for Chart.js to load if it's being loaded asynchronously
+function waitForChartJS() {
+  return new Promise((resolve) => {
+    if (window.Chart) {
+      resolve();
+      return;
+    }
+
+    // Check if Chart.js script is in the DOM
+    const chartScript = document.querySelector('script[src*="chart.js"]');
+    if (!chartScript) {
+      resolve(); // No Chart.js script, use fallback
+      return;
+    }
+
+    // Wait for Chart.js to load, but timeout after 5 seconds
+    let timeout = setTimeout(() => {
+      console.log('Chart.js load timeout, using fallback');
+      resolve();
+    }, 5000);
+
+    const checkChart = () => {
+      if (window.Chart) {
+        console.log('Chart.js loaded successfully');
+        clearTimeout(timeout);
+        resolve();
+      } else {
+        setTimeout(checkChart, 100);
+      }
+    };
+    checkChart();
+  });
+}
 // Simple canvas fallback if Chart.js is missing
 function drawFallbackChart(values){
   const canvas = document.getElementById('kpiChart');
@@ -20,34 +54,69 @@ function drawFallbackChart(values){
   const w = canvas.width = canvas.offsetWidth; const h = canvas.height = 220;
   ctx.clearRect(0,0,w,h);
   const labels = ['Income','Outflows','Contingency','Safe'];
-  const max = Math.max(1, ...values);
+  const max = Math.max(1, ...values.map(Math.abs));
   const barW = Math.min(80, (w-60)/values.length - 20);
   const colors = ['#3b82f6','#ef4444','#f59e0b','#22c55e'];
   values.forEach((v,i)=>{
     const x = 40 + i*(barW+20);
-    const barH = (v/max)*(h-60);
-    ctx.fillStyle = colors[i];
-    ctx.fillRect(x, h-30-barH, barW, barH);
-    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted') || '#888';
+    if (v < 0) {
+      const barH = Math.abs(v/max)*(h-60);
+      ctx.fillStyle = '#ef4444'; // red for negative
+      ctx.fillRect(x, h-30, barW, barH);
+    } else {
+      const barH = (v/max)*(h-60);
+      ctx.fillStyle = colors[i];
+      ctx.fillRect(x, h-30-barH, barW, barH);
+    }
+    ctx.fillStyle = (getComputedStyle && getComputedStyle(document.documentElement).getPropertyValue('--muted')) || '#888';
     ctx.fillText(labels[i], x, h-12);
   });
 }
 
 
 // ----- Theme -----
-(function initTheme(){
+function initTheme(){
   const saved = localStorage.getItem('theme') || 'dark';
   document.documentElement.setAttribute('data-theme', saved);
   const btn = document.getElementById('themeToggle');
-  btn.textContent = saved==='dark' ? '🌙' : '☀️';
+  if (!btn) {
+    console.warn('Theme toggle button not found, retrying...');
+    // Retry up to 5 times with increasing delay
+    let retries = 0;
+    const retryInit = () => {
+      retries++;
+      const btnRetry = document.getElementById('themeToggle');
+      if (btnRetry || retries >= 5) {
+        if (btnRetry) {
+          btnRetry.textContent = saved==='dark' ? '☀️' : '🌙';
+          btnRetry.addEventListener('click', ()=>{
+            const cur = document.documentElement.getAttribute('data-theme');
+            const next = cur==='dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            document.documentElement.offsetHeight; // Force repaint
+            localStorage.setItem('theme', next);
+            btnRetry.textContent = next==='dark' ? '☀️' : '🌙';
+            render(); // Redraw chart on theme change
+          });
+        }
+      } else {
+        setTimeout(retryInit, retries * 100);
+      }
+    };
+    setTimeout(retryInit, 100);
+    return;
+  }
+  btn.textContent = saved==='dark' ? '☀️' : '🌙';
   btn.addEventListener('click', ()=>{
     const cur = document.documentElement.getAttribute('data-theme');
     const next = cur==='dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
+    document.documentElement.offsetHeight; // Force repaint
     localStorage.setItem('theme', next);
-    btn.textContent = next==='dark' ? '🌙' : '☀️';
+    btn.textContent = next==='dark' ? '☀️' : '🌙';
+    render(); // Redraw chart on theme change
   });
-})();
+}
 
 // ----- IndexedDB for documents -----
 let idb;
@@ -62,8 +131,8 @@ function idbOpen(){
 
 // ----- File type guard -----
 const ALLOWED_MIME_PREFIX = ['image/','text/'];
-const ALLOWED_MIME_EXACT = new Set(['application/pdf']);
-const ALLOWED_EXT = new Set(['.pdf','.txt','.md','.markdown','.csv','.log','.json','.png','.jpg','.jpeg','.gif','.webp','.svg','.heic','.heif','.bmp']);
+const ALLOWED_MIME_EXACT = new Set(['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']);
+const ALLOWED_EXT = new Set(['.pdf','.txt','.md','.markdown','.csv','.log','.json','.png','.jpg','.jpeg','.gif','.webp','.svg','.heic','.heif','.bmp','.rtf','.doc','.docx','.tiff']);
 function isAllowedNameType(name, type){
   type = type || '';
   const t = type.toLowerCase();
@@ -88,7 +157,7 @@ async function saveFiles(entryId, fileList){
     const buf = await f.arrayBuffer();
     return { id: crypto.randomUUID(), entryId, name:f.name, type:f.type, data: buf };
   }));
-  if (skipped>0) { toast(`${skipped} file(s) skipped (only text, image, or PDF allowed)`); }
+  if (skipped>0) { toast(`${skipped} file(s) skipped (only text, image, PDF, and document files allowed)`); }
   const tx = idb.transaction('files','readwrite');
   const store = tx.objectStore('files');
   for(const rec of recs){ store.put(rec); }
@@ -187,14 +256,14 @@ function monthlyPortion(entry, ref, type, incomeTotalForCont=0){
   if(amount === '' || amount === null || amount === undefined) return 0;
   if(type==='cont' && Number(amount) <= 1){
     return recurrence==='One-Time'
-      ? (inWindow(ref,startMonth,durationMonths) ? round2(Number(amount) * incomeTotalForCont) : 0)
-      : round2(Number(amount) * incomeTotalForCont);
+      ? (inWindow(ref,startMonth,durationMonths) ? (Number(amount) * incomeTotalForCont) / Number(durationMonths) : 0)
+      : Number(amount) * incomeTotalForCont;
   }
   const amt = Number(amount);
   if(recurrence === 'One-Time'){
-    return inWindow(ref,startMonth,durationMonths) ? round2(amt / Number(durationMonths)) : 0;
+    return inWindow(ref,startMonth,durationMonths) ? amt / Number(durationMonths) : 0;
   }
-  const f = FACTORS[recurrence] ?? 1; return round2(amt * f);
+  const f = FACTORS[recurrence] ?? 1; return amt * f;
 }
 
 // ----- Compute KPIs -----
@@ -205,9 +274,9 @@ function compute(){
   const outParts = store.outflows.map(e => monthlyPortion(e, ref, 'out'));
   const outflowTotal = round2(outParts.reduce((a,b)=>a+b,0));
   const contParts = store.contingencies.map(e => monthlyPortion(e, ref, 'cont', incomeTotal));
-  const contAlloc = round2(store.contingencies.reduce((s,e,i)=> s + ((Number(e.amount)<=1)? contParts[i] : 0), 0));
-  const contGoals = round2(store.contingencies.reduce((s,e,i)=> s + ((Number(e.amount)>1)? contParts[i] : 0), 0));
-  const contFixed = round2(Number(store.settings.contingencyFixed||0));
+  const contAlloc = store.contingencies.reduce((s,e,i)=> s + ((Number(e.amount)<=1)? contParts[i] : 0), 0);
+  const contGoals = store.contingencies.reduce((s,e,i)=> s + ((Number(e.amount)>1)? contParts[i] : 0), 0);
+  const contFixed = Number(store.settings.contingencyFixed||0);
   const contTotal = round2(contFixed + contAlloc + contGoals);
   const safe = round2(incomeTotal - (outflowTotal + contTotal));
   return { incomeTotal, outflowTotal, contFixed, contAlloc, contGoals, contTotal, safe };
@@ -215,27 +284,54 @@ function compute(){
 
 // ----- Rendering -----
 let chart;
-function render(){
+async function render(){
   const { incomeTotal, outflowTotal, contFixed, contAlloc, contGoals, contTotal, safe } = compute();
-  qs('#kpi-income').textContent = INR.format(incomeTotal);
-  qs('#kpi-outflow').textContent = INR.format(outflowTotal);
-  qs('#kpi-cont').textContent = INR.format(contTotal);
-  qs('#kpi-cont-fixed').textContent = INR.format(contFixed);
-  qs('#kpi-cont-alloc').textContent = INR.format(contAlloc);
-  qs('#kpi-cont-goals').textContent = INR.format(contGoals);
-  qs('#kpi-safe').textContent = INR.format(safe);
+
+  const kpiIncome = qs('#kpi-income');
+  if (kpiIncome) kpiIncome.textContent = INR.format(incomeTotal);
+  const kpiOutflow = qs('#kpi-outflow');
+  if (kpiOutflow) kpiOutflow.textContent = INR.format(outflowTotal);
+  const kpiCont = qs('#kpi-cont');
+  if (kpiCont) kpiCont.textContent = INR.format(contTotal);
+  const kpiContFixed = qs('#kpi-cont-fixed');
+  if (kpiContFixed) kpiContFixed.textContent = INR.format(contFixed);
+  const kpiContAlloc = qs('#kpi-cont-alloc');
+  if (kpiContAlloc) kpiContAlloc.textContent = INR.format(contAlloc);
+  const kpiContGoals = qs('#kpi-cont-goals');
+  if (kpiContGoals) kpiContGoals.textContent = INR.format(contGoals);
+  const kpiSafe = qs('#kpi-safe');
+  if (kpiSafe) kpiSafe.textContent = INR.format(safe);
+
   updateChart(incomeTotal, outflowTotal, contTotal, safe);
 
-  renderTable('tbl-income', store.incomes, 'inc');
+  // Only render tables if they exist in the DOM
+  const tablesToRender = [
+    { id: 'tbl-income', data: store.incomes, type: 'inc' },
+    { id: 'tbl-outflow', data: store.outflows, type: 'out' },
+    { id: 'tbl-cont', data: store.contingencies, type: 'cont' },
+    { id: 'tbl-source', data: store.sources, type: 'src' }
+  ];
+
+  for (const table of tablesToRender) {
+    if (qs('#' + table.id)) {
+      await renderTable(table.id, table.data, table.type);
+    } else {
+      console.warn(`Table ${table.id} not found in DOM, skipping render`);
+    }
+  }
+
   // Auto-select first source if sources exist (for scenario 2)
   const autoSelectFirst = store.sources.length > 0;
   populateSourceSelects(null, autoSelectFirst);
-  renderTable('tbl-outflow', store.outflows, 'out');
-  renderTable('tbl-cont', store.contingencies, 'cont');
-  renderTable('tbl-source', store.sources, 'src');
 
-  qs('#refMonth').value = store.settings.refMonth;
-  qs('#contFixed').value = store.settings.contingencyFixed;
+  const refMonthInput = qs('#refMonth');
+  if (refMonthInput) {
+    refMonthInput.value = store.settings.refMonth;
+  }
+  const contFixedInput = qs('#contFixed');
+  if (contFixedInput) {
+    contFixedInput.value = store.settings.contingencyFixed;
+  }
 }
 function hasAttachmentsForEntry(entryId){
   return listFiles(entryId).then(files => files.length > 0);
@@ -243,29 +339,36 @@ function hasAttachmentsForEntry(entryId){
 
 async function renderTable(id, rows, type){
   const el = qs('#'+id);
+  if (!el) {
+    console.warn(`Table element #${id} not found`);
+    return;
+  }
   const headers = type==='src'
-    ? ['Name','Type','Note?','Docs?','Docs','', '', '']
+    ? ['Name','Type','Note?','Attachments','Docs','', '', '']
     : (type==='inc'
         ? ['Title','Amount','Recurrence','Note?','Has Docs?','Monthly Portion','', '', '']
         : ['Title','Amount','Recurrence','Note?','Has Docs?','Monthly Portion','', '', '']);
   el.innerHTML = `<thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>`;
   const body = document.createElement('tbody'); const ref = refMonthDate(); const incTotal = compute().incomeTotal;
+
+  // Pre-load document counts for sources to avoid layout shifts
+  let attachmentMap = new Map();
+  if(type === 'src'){
+    const attachmentPromises = rows.map(r => hasAttachmentsForEntry(r.id).then(has => ({id: r.id, has})));
+    const attachments = await Promise.all(attachmentPromises);
+    attachmentMap = new Map(attachments.map(a => [a.id, a.has]));
+  }
+
   rows.forEach((r,idx)=>{
     const mp = (type==='src') ? 0 : monthlyPortion(r, ref, type==='cont'?'cont':'row', incTotal);
     const tr = document.createElement('tr');
     if(type==='src'){
-      // Check if entry has attachments
-      hasAttachmentsForEntry(r.id).then(hasAttachments => {
-        const docsCell = tr.querySelector('td:nth-child(4)');
-        if (docsCell) {
-          docsCell.innerHTML = hasAttachments ? `<button class="btn ghost" data-docs="${r.id}">Open</button>` : '<span class="muted small">No documents</span>';
-        }
-      });
+      const hasAttachments = attachmentMap.get(r.id);
       tr.innerHTML = `
         <td>${r.name||''}</td>
         <td>${r.type||''}</td>
         <td>${(r.note && r.note.trim())?'Yes':'No'}</td>
-        <td><span class="docs-loading">Loading...</span></td>
+        <td>${hasAttachments ? `<button class="btn ghost" data-docs="${r.id}">Open</button>` : '<span class="muted small">No documents</span>'}</td>
         <td><button class="btn ghost" data-view="${type}:${r.id}">View</button></td>
         <td><button class="btn" data-edit="${type}:${r.id}">Edit</button></td>
         <td><button class="btn danger" data-del="${type}:${r.id}">Delete</button></td>`;
@@ -370,13 +473,67 @@ async function displayAttachmentsWithRemove(wrap, entryId, modal = false) {
 
 function updateChart(a,b,c,d){
   const values = [a,b,c,d];
-  if (window.Chart){
-    const ctx = qs('#kpiChart');
-    const colors = ['#3b82f6','#ef4444','#f59e0b','#22c55e'];
-    if(!chart){
-      chart = new Chart(ctx, { type:'bar', data:{ labels:['Income','Outflows','Contingency','Safe-to-Spend'], datasets:[{ data: values, backgroundColor: colors }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true }}}});
-    } else {
-      chart.data.datasets[0].data = values; chart.update();
+  const canvas = qs('#kpiChart');
+  if (!canvas) {
+    console.warn('Chart canvas not found, skipping chart update');
+    return;
+  }
+
+  // Clear any existing chart instance to prevent conflicts
+  if (chart && typeof chart.destroy === 'function') {
+    chart.destroy();
+    chart = null;
+  }
+
+  if (window.Chart && canvas.getContext){
+    try {
+      const ctx = canvas.getContext('2d');
+      const colors = ['#3b82f6','#ef4444','#f59e0b','#22c55e'];
+
+      // Clear canvas before creating new chart
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Ensure canvas dimensions are set properly
+      const container = canvas.parentElement;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        canvas.width = rect.width || 400;
+        canvas.height = 220;
+      }
+
+      chart = new Chart(ctx, {
+        type:'bar',
+        data:{
+          labels:['Income','Outflows','Contingency','Safe-to-Spend'],
+          datasets:[{
+            data: values,
+            backgroundColor: colors,
+            borderWidth: 1
+          }]
+        },
+        options:{
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value) {
+                  return '₹' + value.toLocaleString('en-IN');
+                }
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: false
+            }
+          }
+        }
+      });
+    } catch (e) {
+      console.error('Chart.js error, falling back to canvas:', e);
+      drawFallbackChart(values);
     }
   } else {
     drawFallbackChart(values);
@@ -448,19 +605,34 @@ function bindForms(){
     });
   });
 
-  qs('#refMonth').addEventListener('change', e=>{ store.settings.refMonth=e.target.value; save(); render(); });
-  qs('#contFixed').addEventListener('change', e=>{ store.settings.contingencyFixed=Number(e.target.value||0); save(); render(); });
+  const refMonthEl = qs('#refMonth');
+  if (refMonthEl) {
+    refMonthEl.addEventListener('change', e=>{ store.settings.refMonth=e.target.value; save(); render(); });
+  }
+  const contFixedEl = qs('#contFixed');
+  if (contFixedEl) {
+    contFixedEl.addEventListener('change', e=>{ store.settings.contingencyFixed=Number(e.target.value||0); save(); render(); });
+  }
 
   // Excel I/O
 
   // CSV per-sheet
 
-  qs('#btn-export-json').addEventListener('click', exportJSON);
-  qs('#file-import-json').addEventListener('change', (e)=>{ const f=e.target.files[0]; if(f) importJSON(f); });
+  const exportBtn = qs('#btn-export-json');
+  if (exportBtn) {
+    exportBtn.addEventListener('click', exportJSON);
+  }
+  const importInput = qs('#file-import-json');
+  if (importInput) {
+    importInput.addEventListener('change', (e)=>{ const f=e.target.files[0]; if(f) importJSON(f); });
+  }
   // Google Drive event listeners removed
 
-  qs('#btn-clear').addEventListener('click', ()=>{ if(confirm('Reset all data?')){ localStorage.removeItem(LS_KEY); location.reload();
+  const clearBtn = qs('#btn-clear');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', ()=>{ if(confirm('Reset all data?')){ localStorage.removeItem(LS_KEY); location.reload();
 migrateSourcesLinkage(); } });
+  }
 }
 function showOneTimeToggles(form){
   const rec = form.querySelector('select[name=recurrence]');
@@ -488,13 +660,12 @@ function validateForm(obj, kind){
   if(kind==='source'){ if(!obj.name) return toast('Source name required','error'), false; return true; }
   if(!obj.title) return toast('Title required','error'), false;
   const amount = Number(obj.amount||0);
-  if(isNaN(amount) || amount<0) return toast('Amount must be ≥ 0','error'), false;
+  if(isNaN(amount) || amount<=0) return toast('Amount must be > 0','error'), false;
   if(!allowedRec.includes(obj.recurrence)) return toast('Invalid recurrence','error'), false;
   if(obj.recurrence==='One-Time'){
     if(!obj.startMonth) return toast('Start Month required for One-Time','error'), false;
     if(!(obj.durationMonths>0)) return toast('Duration must be ≥ 1','error'), false;
   }
-  if(kind==='cont' && amount<=1 && amount<0) return toast('Percent must be ≥ 0','error'), false;
   return true;
 }
 
@@ -516,7 +687,7 @@ async function onView(e){
       ['Note',(obj.note||'')]
     ];
   })();
-  const extras = (obj.recurrence==='One-Time' && type!=='src') ? `<button class="btn ghost" data-dup="${type}:${obj.id}">Duplicate window…</button>` : '';
+  const extras = (obj.recurrence === 'One-Time' && obj.recurrence !== undefined) ? `<button class="btn ghost" data-dup="${type}:${obj.id}">Duplicate window…</button>` : '';
   
   // Check if entry has attachments before showing the button
   const hasAttachments = await hasAttachmentsForEntry(obj.id);
@@ -533,6 +704,7 @@ function onEdit(e){
   const form = (type==='inc')? formTemplate('income', obj) : (type==='out')? formTemplate('outflow', obj) : (type==='cont')? formTemplate('cont', obj) : formTemplate('source', obj);
   openModal('Edit', form, true, async ()=>{
     const f = qs('#modal form');
+    if (!f) return false;
     if(type==='src'){
       obj.name=f.name.value.trim(); obj.type=f.type.value.trim(); obj.note=f.note.value.trim();
       const files=f.querySelector('input[name=files]').files; if(files.length) await saveFiles(obj.id, files);
@@ -607,7 +779,7 @@ function formTemplate(kind, obj){
   const amtPh = isCont ? 'Amount (₹) or % (0.10 for 10%)' : 'Amount (₹)';
   return `<form class="grid-2 need-validate">
     <input name="title" value="${escapeAttr(obj.title||'')}" required>
-    <input name="amount" type="number" step="0.01" value="${escapeAttr(obj.amount)}" placeholder="${amtPh}" ${isCont?'min="0.00"':'min="0.01"'} required>
+    <input name="amount" type="number" step="0.01" value="${escapeAttr(obj.amount)}" placeholder="${amtPh}" min="0.01" required>
     <div class="stack"><select name="sourceId"></select><button type="button" class="btn ghost small" data-add-source>+ Add Source</button></div>
     <select name="recurrence" required>${Object.keys(FACTORS).concat('One-Time').map(k=>`<option ${obj.recurrence===k?'selected':''}>${k}</option>`).join('')}</select>
     <input name="startMonth" type="month" class="one-time-only" value="${obj.startMonth||''}">
@@ -632,7 +804,7 @@ function openModal(title, innerHTML, editable=false, onSave=null){
   const titleEl = document.getElementById('modal-title');
   const bodyEl = document.getElementById('modal-body');
   const saveBtn = document.getElementById('modal-save');
-  if(!dlg || !titleEl || !bodyEl || !saveBtn){ console.error('Modal elements missing'); return; }
+  if(!dlg || !titleEl || !bodyEl || !saveBtn){ console.error('Modal elements missing'); toast('Application error: modal not available', 'error'); return; }
   titleEl.textContent = title || 'View';
   bodyEl.innerHTML = innerHTML || '';
   saveBtn.hidden = !editable;
@@ -695,9 +867,12 @@ function bindAttachPicker(root){
 
 // ----- Toasts -----
 function toast(msg, type='ok'){
-  const s = qs('#status'); s.textContent = msg;
-  s.style.color = (type==='error')?'#ef4444':'var(--muted)';
-  setTimeout(()=>{ s.textContent='Ready'; s.style.color=''; }, 2000);
+  const s = qs('#status');
+  if (s) {
+    s.textContent = msg;
+    s.style.color = (type==='error')?'#ef4444':'var(--muted)';
+    setTimeout(()=>{ s.textContent='Ready'; s.style.color=''; }, 2000);
+  }
 }
 
 
@@ -706,13 +881,15 @@ function populateSourceSelects(root, autoSelectFirst = false){
   selects.forEach(sel=>{
     const cur = sel.value;
     sel.innerHTML = '<option value="">(No Source)</option>' + store.sources.map(s=> `<option value="${s.id}">${escapeHtml(s.name||'Untitled')}</option>`).join('');
-    
-    // Auto-select logic
-    if (autoSelectFirst && store.sources.length > 0) {
-      sel.value = store.sources[0].id;
-    } else if (cur) {
+
+    // Auto-select logic with validity check
+    const isValid = cur && store.sources.some(s => s.id === cur);
+    if (isValid) {
       sel.value = cur;
+    } else if (autoSelectFirst && store.sources.length > 0) {
+      sel.value = store.sources[0].id;
     }
+    // Otherwise, leave as default (empty)
   });
 }
 function quickAddSource(){
@@ -728,14 +905,27 @@ function quickAddSource(){
 }
 
 // ----- Tabs -----
-document.querySelectorAll('.tab').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-    qs('#'+btn.dataset.tab).classList.add('active');
+function initTabs(){
+  document.querySelectorAll('.tab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      const tabContent = qs('#'+btn.dataset.tab);
+      if (tabContent) {
+        tabContent.classList.add('active');
+      }
+
+      // Re-render dashboard when returning to it
+      if (btn.dataset.tab === 'dashboard') {
+        // Small delay to ensure DOM is updated, then re-render everything
+        setTimeout(async () => {
+          await render();
+        }, 10);
+      }
+    });
   });
-});
+}
 
 // Excel features removed
 
@@ -748,7 +938,7 @@ async function exportJSON(){
   try{
     const files = await getAllFilesRecords();
     payload.attachments = files.map(f=> ({ id:f.id, entryId:f.entryId, name:f.name, type:f.type, dataB64: bufToB64(f.data) }));
-  }catch(e){ console.warn('Attachment export failed', e); }
+  }catch(e){ toast('Attachment export failed', 'error'); }
   const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -766,6 +956,28 @@ function migrateSourcesLinkage(){
     const byName = new Map(store.sources.map(s=> [ (s.name||'').trim().toLowerCase(), s ]));
     for(const inc of (store.incomes||[])){
       if(!inc.sourceId){
+        // Try to find matching source by name
+        const matchingSource = byName.get((inc.title||'').trim().toLowerCase());
+        if(matchingSource){
+          inc.sourceId = matchingSource.id;
+        }
+      }
+    }
+    // Also check outflows and contingencies for source linkage
+    for(const out of (store.outflows||[])){
+      if(!out.sourceId){
+        const matchingSource = byName.get((out.title||'').trim().toLowerCase());
+        if(matchingSource){
+          out.sourceId = matchingSource.id;
+        }
+      }
+    }
+    for(const cont of (store.contingencies||[])){
+      if(!cont.sourceId){
+        const matchingSource = byName.get((cont.title||'').trim().toLowerCase());
+        if(matchingSource){
+          cont.sourceId = matchingSource.id;
+        }
       }
     }
   }catch(e){ console.warn('migrateSourcesLinkage failed', e); }
@@ -786,17 +998,19 @@ function importJSON(file){
         await idbOpen();
         const tx = idb.transaction('files','readwrite');
         const storeFiles = tx.objectStore('files');
+        let attachmentFailures = 0;
         for(const rec of obj.attachments){
           try{
             const data = b64ToBuf(rec.dataB64);
             storeFiles.put({ id: rec.id || uid(), entryId: rec.entryId, name: rec.name, type: rec.type, data });
-          }catch(err){ console.warn('Skip bad attachment', err); }
+          }catch(err){ console.warn('Skip bad attachment', err); attachmentFailures++; }
         }
         await new Promise((resolve,reject)=>{ tx.oncomplete=()=>resolve(); tx.onerror=()=>reject(tx.error); tx.onabort=()=>reject(tx.error); });
+        if(attachmentFailures > 0) toast(`${attachmentFailures} attachment(s) failed to import`, 'error');
       }
       migrateSourcesLinkage();
-      save(); render(); toast('Data imported');
-    }catch(e){ console.error(e); toast('Import failed: invalid JSON','error'); }
+      render(); toast('Data imported');
+    }catch(e){ console.error(e); toast('Import failed: ' + (e.message || 'invalid data'), 'error'); }
   };
   reader.readAsText(file);
 }
@@ -808,10 +1022,31 @@ function escapeHtml(s){ s = (s===undefined||s===null)? '' : String(s); return s.
 function escapeAttr(s){ return escapeHtml(s); }
 
 libsReady();
+
 // ----- Init -----
-load();
-migrateSourcesLinkage();
-bindForms();
-render();
+async function init() {
+  console.log('init called');
+  // Wait for Chart.js to load
+  await waitForChartJS();
+
+  // Initialize theme
+  initTheme();
+
+  load();
+  migrateSourcesLinkage();
+  bindForms();
+  initTabs();
+  await render();
+}
+
+// Initialize after DOM and CSS are loaded
+init();
+
+// Handle window resize for chart responsiveness
+window.addEventListener('resize', () => {
+  if (chart && typeof chart.resize === 'function') {
+    setTimeout(() => chart.resize(), 100);
+  }
+});
 
 // PWA install

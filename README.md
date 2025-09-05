@@ -10,8 +10,8 @@ No server. No sign-up. Your data (and documents) live **locally** in your browse
 * **Simple, elegant UI** with light/dark mode
 * **Incomes, Outflows, Contingencies** (recurring + one-time windows)
 * **Sources** (user-defined) linked to Incomes, Outflows, and Contingencies
-* **Docs?** column shows if entries have attachments (Yes/No)
-* **Attachments** per entry (image, text, or PDF)
+* **Attachments** column shows attachment status for sources
+* **Attachments** per entry (image, text, PDF, and document files)
 
   * Add multiple files, remove before saving (chips with ×)
   * View: pick which attachment to open
@@ -77,10 +77,10 @@ All state lives in `localStorage` (structured store) + attachments in **IndexedD
 
 ## Attachments
 
-* Allowed: **images**, **PDF**, **text**
+* Allowed: **images**, **PDF**, **text**, **documents**
 
-  * MIME: `image/*`, `application/pdf`, `text/*`
-  * Extensions supported include: `.png .jpg .jpeg .gif .webp .svg .heic .heif .bmp .pdf .txt .md .markdown .csv .log .json`
+  * MIME: `image/*`, `application/pdf`, `text/*`, `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+  * Extensions supported include: `.png .jpg .jpeg .gif .webp .svg .heic .heif .bmp .pdf .txt .md .markdown .csv .log .json .rtf .doc .docx .tiff`
 * Add multiple files, remove before saving (chip ×)
 * **View** → documents chooser to open selected file
 * **Edit** → see existing list with **Delete** buttons (with confirmation)
